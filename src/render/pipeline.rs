@@ -1,13 +1,11 @@
 //! Pipeline module contains types and utilities for working with shaders,
 //! including macros for WGSL and SPIR-V inclusion, as well as shader resource management.
 
-use bytemuck::Pod;
 use wgpu::PipelineCompilationOptions;
 use crate::render::shader_resource::ShaderResourceLayout;
 
 use super::RenderDevice;
 use super::types::*;
-use super::{buffer::{BufferStorage, BufferResourceDescriptor}, texture::{Texture, TextureResourceDescriptor, TextureResourceUsage}};
 
 #[cfg(doc)]
 use super::pass::RenderPass;

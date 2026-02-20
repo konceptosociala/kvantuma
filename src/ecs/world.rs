@@ -4,8 +4,8 @@ pub trait Component {}
 
 #[derive(Default)]
 pub struct World {
-    archetypes: Vec<Archetype>,
-    mask: BitArray,
+    _archetypes: Vec<Archetype>,
+    _mask: BitArray,
 }
 
 pub struct Archetype {

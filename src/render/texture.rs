@@ -197,7 +197,7 @@ impl Texture {
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(bytes_per_row as u32),
-                rows_per_image: Some(image.height() as u32),
+                rows_per_image: Some(image.height()),
             },
             wgpu::Extent3d {
                 width: image.width(),

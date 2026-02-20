@@ -1,12 +1,20 @@
-use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use kvantuma::{
     app::{
         App, Game,
         window::{WindowDescriptor, WindowMode},
-    }, ecs::world::World, render::{Drawable, RenderDevice, RenderSurface, buffer::BufferHandle, error::RenderError, material::Vertex, pipeline::{Pipeline, RenderPipelineDescriptor}, registry::RenderRegistry}
+    }, 
+    ecs::world::World, 
+    render::{
+        Drawable, RenderDevice, RenderSurface, 
+        buffer::BufferHandle, 
+        error::RenderError, 
+        material::{TintedTextureMaterial, Vertex}, 
+        pass::DrawDescriptor, 
+        registry::RenderRegistry,
+        types::*,
+    }
 };
-use wgpu::{BufferUsages, TextureFormat, include_wgsl};
 
 pub struct Triangle {
     pub vertex_data: [Vertex; 3],
@@ -30,7 +38,8 @@ impl Drawable for Triangle {
         world
             .get_buffer(handle) 
             .expect("Cannot call update() on Triangle")
-            .fill_exact(render_device, 0, &self.vertex_data);
+            .fill_exact(render_device, 0, &self.vertex_data)
+            .unwrap();
     }
     
 
@@ -46,18 +55,15 @@ impl Default for Triangle {
             vertex_data: [
                 Vertex {
                     position: Vec3::new(0.0, 0.5, 0.0),
-                    normal: Vec3::new(0.0, 0.0, 1.0),
-                    color: Vec3::new(1.0, 0.0, 0.0),
+                    texcoord: Vec2::new(0.5, 0.0),
                 },
                 Vertex {
                     position: Vec3::new(-0.5, -0.5, 0.0),
-                    normal: Vec3::new(0.0, 0.0, 1.0),
-                    color: Vec3::new(0.0, 1.0, 0.0),
+                    texcoord: Vec2::new(0.0, 1.0),
                 },
                 Vertex {
                     position: Vec3::new(0.5, -0.5, 0.0),
-                    normal: Vec3::new(0.0, 0.0, 1.0),
-                    color: Vec3::new(0.0, 0.0, 1.0),
+                    texcoord: Vec2::new(1.0, 1.0),
                 },
             ],
             vertex_buffer: None,
@@ -67,36 +73,37 @@ impl Default for Triangle {
 
 struct KvantumaGame {
     // materials: MaterialRegistry,
-    world: RenderRegistry,
-    pipeline: Option<Pipeline>,
+    registry: RenderRegistry,
+    material: Option<TintedTextureMaterial>,
     triangle: Option<Triangle>,
 }
 
 impl Game for KvantumaGame {
     fn init(&mut self, world: &mut World, render_device: &mut RenderDevice) -> anyhow::Result<()> {
+        self.registry.register_material::<TintedTextureMaterial>(render_device);
+        
         self.triangle = Some(Triangle::default());
-        self.triangle.as_mut().unwrap().update(render_device, &mut self.world);
+        self.triangle.as_mut().unwrap().update(render_device, &mut self.registry);
 
-        self.pipeline = Some(Pipeline::new_render(render_device, &RenderPipelineDescriptor {
-            shader: include_wgsl!("../assets/shaders/basic.wgsl"),
-            bindings: &[],
-            label: "Basic pipeline",
-            surface_formats: &[render_device.surface_format()],
-            vertex_layout: Some(Vertex::vertex_buffer_layout()),
-        }));
+        self.material = Some(TintedTextureMaterial::new(
+            "assets/textures/test.png", 
+            Vec3::new(0.0, 1.0, 0.5), 
+            render_device, 
+            &mut self.registry,
+        )?);
 
         Ok(())
     }
 
-    fn update(&mut self, world: &mut World) -> anyhow::Result<()> {
+    fn update(&mut self, _world: &mut World) -> anyhow::Result<()> {
         Ok(())
     }
 
-    fn input(&mut self, event: &glfw::WindowEvent, world: &mut World) -> anyhow::Result<bool> {
+    fn input(&mut self, _event: &glfw::WindowEvent, _world: &mut World) -> anyhow::Result<bool> {
         Ok(false)
     }
 
-    fn render(&mut self, world: &mut World, render_device: &mut RenderDevice) -> Result<(), RenderError> {
+    fn render(&mut self, _world: &mut World, render_device: &mut RenderDevice) -> Result<(), RenderError> {
         let canvas = render_device.canvas()?;
         let canvases: &[&dyn RenderSurface] = &[&canvas];
         let mut ctx = render_device.draw_ctx();
@@ -104,12 +111,11 @@ impl Game for KvantumaGame {
         {
             let mut render_pass = ctx.render_pass(canvases, render_device.depth_texture());
 
-            // render_pass.draw(&self.world, DrawDescriptor::<()> {
-            //     drawable: Some(self.triangle.as_ref().unwrap()),
-            //     instance_data: None, 
-            //     pipeline: self.pipeline.as_ref().unwrap(),
-            //     shader_resources: &[],
-            // });
+            render_pass.draw(render_device, &self.registry, DrawDescriptor::<(), _> {
+                drawable: Some(self.triangle.as_ref().unwrap()),
+                instance_data: None,
+                material: self.material.as_ref().unwrap(),
+            });
         }
 
         ctx.apply(canvas, render_device);
@@ -119,6 +125,8 @@ impl Game for KvantumaGame {
 }
 
 fn main() -> anyhow::Result<()> {
+    pretty_env_logger::init();
+
     App::new(
         WindowDescriptor {
             width: 1280,
@@ -127,9 +135,8 @@ fn main() -> anyhow::Result<()> {
             mode: WindowMode::Windowed,
         }, 
         KvantumaGame {
-            // materials: MaterialRegistry::new(),
-            world: RenderRegistry::new(),
-            pipeline: None,
+            registry: RenderRegistry::new(),
+            material: None,
             triangle: None,
         },
     )?.run();

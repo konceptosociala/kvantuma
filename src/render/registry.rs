@@ -42,6 +42,10 @@ impl RenderRegistry {
             );
     }
 
+    pub fn get_pipeline<M: Material + 'static>(&self) -> Option<&Pipeline> {
+        self.pipelines.get(&TypeId::of::<M>())
+    }
+
     pub fn new_buffer<T: Pod>(
         &mut self,
         render_device: &RenderDevice,
