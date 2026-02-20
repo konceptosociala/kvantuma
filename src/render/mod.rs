@@ -14,6 +14,7 @@ pub mod material;
 pub mod pass;
 pub mod draw_context;
 pub mod shader_resource;
+pub mod mesh;
 
 pub mod types {
     pub use wgpu::{

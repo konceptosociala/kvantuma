@@ -4,7 +4,7 @@ use kvantuma::{
         App, Game,
         window::{WindowDescriptor, WindowMode},
     }, 
-    ecs::world::World, 
+    ecs::world::{World, x}, 
     render::{
         Drawable, RenderDevice, RenderSurface, 
         buffer::BufferHandle, 
@@ -125,21 +125,23 @@ impl Game for KvantumaGame {
 }
 
 fn main() -> anyhow::Result<()> {
-    pretty_env_logger::init();
+    // pretty_env_logger::init();
 
-    App::new(
-        WindowDescriptor {
-            width: 1280,
-            height: 720,
-            title: "KVΛNTUMA",
-            mode: WindowMode::Windowed,
-        }, 
-        KvantumaGame {
-            registry: RenderRegistry::new(),
-            material: None,
-            triangle: None,
-        },
-    )?.run();
+    // App::new(
+    //     WindowDescriptor {
+    //         width: 1280,
+    //         height: 720,
+    //         title: "KVΛNTUMA",
+    //         mode: WindowMode::Windowed,
+    //     }, 
+    //     KvantumaGame {
+    //         registry: RenderRegistry::new(),
+    //         material: None,
+    //         triangle: None,
+    //     },
+    // )?.run();
+
+    x();
 
     Ok(())
 }

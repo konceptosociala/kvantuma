@@ -7,7 +7,6 @@ edition = "2024"
 anyhow = "1.0.101"
 bincode = "2.0.1"
 bitflags = "2.11.0"
-bitvec = "1.0.1"
 bytemuck = { version = "1.25.0", features = ["derive"] }
 glam = { version = "0.32.0", features = ["serde", "bytemuck", "rand"] }
 gltf = { version = "1.4.1", features = ["extras"] }

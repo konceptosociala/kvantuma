@@ -1,3 +1,4 @@
+use glam::UVec2;
 use glfw::{Glfw, PWindow, WindowEvent};
 
 use crate::{app::{helper::{GameLoopCallbacks, game_loop}, window::{Events, WindowDescriptor, WindowMode}}, ecs::world::World, error::GameError, render::{RenderDevice, error::RenderError}};
@@ -119,8 +120,19 @@ impl<G: Game + 'static> App<G> {
                         panic!("Dropped frame with error: {e}");
                     }
                 },
-                handler: |g, e| { g.game.game.input(e, &mut g.game.world)
-                    .unwrap_or_else(|err| panic!("Failed game input: {err}")); },
+                handler: |g, e| {
+                    #[allow(clippy::single_match)]
+                    match e {
+                        WindowEvent::FramebufferSize(w, h) => {
+                            g.game.render_device.resize_with(UVec2::new(*w as u32, *h as u32));
+                        }
+                        // Other events
+                        _ => {}
+                    }
+
+                    g.game.game.input(e, &mut g.game.world)
+                        .unwrap_or_else(|err| panic!("Failed game input: {err}"));
+                },
             },
         );
     }

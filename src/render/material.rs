@@ -46,6 +46,7 @@ impl Vertex {
     }
 }
 
+#[derive(Debug)]
 pub struct TintedTextureMaterial {
     pub albedo: TextureHandle,
     pub tint: Vec3,
