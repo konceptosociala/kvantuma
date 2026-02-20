@@ -26,11 +26,8 @@ impl World {
 #[derive(Clone, Copy, Zeroable, Pod, Debug)]
 #[repr(C)]
 struct PodType { a: i32 }
-#[derive(Debug)]
-struct ExternType { b: i32 }
 
 component! { POD: PodType }
-component! { EXTERN: ExternType }
 component! { EXTERN: TintedTextureMaterial }
 
 impl World {
@@ -193,17 +190,35 @@ pub trait ComponentsBundle {
     fn for_each(&self, f: &mut dyn FnMut(&dyn Component));
 }
 
-impl<A: Component> ComponentsBundle for (A,) {
-    fn for_each(&self, f: &mut dyn FnMut(&dyn Component)) {
-        f(&self.0)
-    }
+macro_rules! impl_components_bundle_tuple {
+    () => {};
+    ($($name:ident),+) => {
+        impl<$($name: Component),+> ComponentsBundle for ($($name,)+) {
+            fn for_each(&self, f: &mut dyn FnMut(&dyn Component)) {
+                #[allow(non_snake_case)]
+                let ($($name,)+) = self;
+                $(f($name);)+
+            }
+        }
+    };
 }
-impl<A: Component, B: Component> ComponentsBundle for (A, B) {
-    fn for_each(&self, f: &mut dyn FnMut(&dyn Component)) {
-        f(&self.0);
-        f(&self.1);
-    }
-}
+
+impl_components_bundle_tuple! { A }
+impl_components_bundle_tuple! { A, B }
+impl_components_bundle_tuple! { A, B, C }
+impl_components_bundle_tuple! { A, B, C, D }
+impl_components_bundle_tuple! { A, B, C, D, E }
+impl_components_bundle_tuple! { A, B, C, D, E, F }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O }
+impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P }
 
 pub fn x() {
     let mut world = World::new();

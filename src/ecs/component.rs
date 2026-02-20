@@ -2,8 +2,6 @@ use std::{alloc::Layout, any::TypeId, collections::HashMap, sync::{OnceLock, ato
 
 use parking_lot::Mutex;
 
-use super::archetype::EntityId;
-
 static REGISTRY: OnceLock<Registry> = OnceLock::new();
 
 struct Registry {
@@ -55,18 +53,18 @@ macro_rules! component {
     };
 
     {EXTERN: $name:ident} => {
-        impl Component for $name {
-            fn component_id() -> ComponentId {
-                component_id::<$name>()
+        impl $crate::ecs::component::Component for $name {
+            fn component_id() -> $crate::ecs::component::ComponentId {
+                $crate::ecs::component::component_id::<$name>()
             }
-            fn id(&self) -> ComponentId {
-                component_id::<$name>()
+            fn id(&self) -> $crate::ecs::component::ComponentId {
+                $crate::ecs::component::component_id::<$name>()
             }
             fn layout(&self) -> std::alloc::Layout {
                 std::alloc::Layout::new::<Self>()
             }
-            fn kind(&self) -> ComponentKind {
-                ComponentKind::Extern
+            fn kind(&self) -> $crate::ecs::component::ComponentKind {
+                $crate::ecs::component::ComponentKind::Extern
             }
             fn drop_fn(&self) -> Option<unsafe fn(*mut u8)> {
                 Some(|ptr| unsafe { std::ptr::drop_in_place(ptr as *mut $name) })

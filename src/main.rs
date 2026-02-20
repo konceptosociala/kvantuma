@@ -3,9 +3,7 @@ use kvantuma::{
     app::{
         App, Game,
         window::{WindowDescriptor, WindowMode},
-    }, 
-    ecs::world::{World, x}, 
-    render::{
+    }, component, ecs::world::{World, x}, render::{
         Drawable, RenderDevice, RenderSurface, 
         buffer::BufferHandle, 
         error::RenderError, 
@@ -20,6 +18,8 @@ pub struct Triangle {
     pub vertex_data: [Vertex; 3],
     pub vertex_buffer: Option<BufferHandle>,
 }
+
+component! { EXTERN: Triangle }
 
 impl Drawable for Triangle {
     fn update(
@@ -72,25 +72,24 @@ impl Default for Triangle {
 }
 
 struct KvantumaGame {
-    // materials: MaterialRegistry,
     registry: RenderRegistry,
-    material: Option<TintedTextureMaterial>,
-    triangle: Option<Triangle>,
 }
 
 impl Game for KvantumaGame {
     fn init(&mut self, world: &mut World, render_device: &mut RenderDevice) -> anyhow::Result<()> {
         self.registry.register_material::<TintedTextureMaterial>(render_device);
         
-        self.triangle = Some(Triangle::default());
-        self.triangle.as_mut().unwrap().update(render_device, &mut self.registry);
+        let mut triangle = Triangle::default();
+        triangle.update(render_device, &mut self.registry);
 
-        self.material = Some(TintedTextureMaterial::new(
+        let material = TintedTextureMaterial::new(
             "assets/textures/test.png", 
             Vec3::new(0.0, 1.0, 0.5), 
             render_device, 
             &mut self.registry,
-        )?);
+        )?;
+
+        world.spawn((triangle, material));
 
         Ok(())
     }
@@ -103,18 +102,20 @@ impl Game for KvantumaGame {
         Ok(false)
     }
 
-    fn render(&mut self, _world: &mut World, render_device: &mut RenderDevice) -> Result<(), RenderError> {
+    fn render(&mut self, world: &mut World, render_device: &mut RenderDevice) -> Result<(), RenderError> {
         let canvas = render_device.canvas()?;
         let canvases: &[&dyn RenderSurface] = &[&canvas];
         let mut ctx = render_device.draw_ctx();
+
+        let (triangle, material) = world.query_two_test::<Triangle, TintedTextureMaterial>();
 
         {
             let mut render_pass = ctx.render_pass(canvases, render_device.depth_texture());
 
             render_pass.draw(render_device, &self.registry, DrawDescriptor::<(), _> {
-                drawable: Some(self.triangle.as_ref().unwrap()),
+                drawable: Some(triangle),
                 instance_data: None,
-                material: self.material.as_ref().unwrap(),
+                material,
             });
         }
 
@@ -125,23 +126,19 @@ impl Game for KvantumaGame {
 }
 
 fn main() -> anyhow::Result<()> {
-    // pretty_env_logger::init();
+    pretty_env_logger::init();
 
-    // App::new(
-    //     WindowDescriptor {
-    //         width: 1280,
-    //         height: 720,
-    //         title: "KVΛNTUMA",
-    //         mode: WindowMode::Windowed,
-    //     }, 
-    //     KvantumaGame {
-    //         registry: RenderRegistry::new(),
-    //         material: None,
-    //         triangle: None,
-    //     },
-    // )?.run();
-
-    x();
+    App::new(
+        WindowDescriptor {
+            width: 1280,
+            height: 720,
+            title: "KVΛNTUMA",
+            mode: WindowMode::Windowed,
+        }, 
+        KvantumaGame {
+            registry: RenderRegistry::new(),
+        },
+    )?.run();
 
     Ok(())
 }
