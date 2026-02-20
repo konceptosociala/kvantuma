@@ -1,7 +1,6 @@
-use glfw::{Action, Context, Glfw, Key, PWindow, WindowEvent};
-use glfw::fail_on_errors;
+use glfw::{Glfw, PWindow, WindowEvent};
 
-use crate::{app::{helper::{GameLoopCallbacks, game_loop}, window::{Events, WindowDescriptor, WindowMode}}, ecs::world::World, error::GameError, render::{Renderer, error::RenderError}};
+use crate::{app::{helper::{GameLoopCallbacks, game_loop}, window::{Events, WindowDescriptor, WindowMode}}, ecs::world::World, error::GameError, render::{RenderDevice, error::RenderError}};
 
 pub mod base;
 pub mod helper;
@@ -11,14 +10,14 @@ pub mod window;
 pub struct GameState<G> {
     pub game: G,
     pub world: World,
-    pub renderer: Renderer,
+    pub render_device: RenderDevice,
 }
 
 pub trait Game {
     fn init(
         &mut self, 
         world: &mut World, 
-        renderer: &mut Renderer,
+        render_device: &mut RenderDevice,
     ) -> anyhow::Result<()>;
 
     fn update(
@@ -35,13 +34,13 @@ pub trait Game {
     fn render(
         &mut self, 
         world: &mut World, 
-        renderer: &mut Renderer,
+        render_device: &mut RenderDevice,
     ) -> Result<(), RenderError>;
 }
 
 pub struct App<G> {
     world: World,
-    renderer: Renderer,
+    render_device: RenderDevice,
     events: Events,
     glfw: Glfw,
     window: PWindow,
@@ -50,7 +49,7 @@ pub struct App<G> {
 
 impl<G> App<G> {
     pub fn new(desc: WindowDescriptor, state: G) -> Result<App<G>, GameError> {
-        let mut glfw = glfw::init(glfw::fail_on_errors!())?;
+        let mut glfw = glfw::init(glfw::fail_on_errors)?;
         glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::NoApi));
 
         let world = World::new();
@@ -70,7 +69,7 @@ impl<G> App<G> {
             ).expect("Cannot create GLFW window")
         });
 
-        let renderer = pollster::block_on(Renderer::new(&window))?;
+        let render_device = pollster::block_on(RenderDevice::new(&window))?;
 
         window.set_framebuffer_size_polling(true);
         window.set_key_polling(true);
@@ -79,7 +78,7 @@ impl<G> App<G> {
 
         Ok(App { 
             world, 
-            renderer, 
+            render_device, 
             events,
             glfw,
             state,
@@ -90,10 +89,13 @@ impl<G> App<G> {
 
 impl<G: Game + 'static> App<G> {
     pub fn run(mut self) {
+        self.state.init(&mut self.world, &mut self.render_device)
+            .unwrap_or_else(|e| panic!("Failed to initialize game: {e}"));
+
         let game_state = GameState {
             game: self.state,
             world: self.world,
-            renderer: self.renderer,
+            render_device: self.render_device,
         };
 
         game_loop(
@@ -105,7 +107,7 @@ impl<G: Game + 'static> App<G> {
             GameLoopCallbacks {
                 update: |g| g.game.game.update(&mut g.game.world)
                     .unwrap_or_else(|e| panic!("Failed game update: {e}")),
-                render: |g| match g.game.game.render(&mut g.game.world, &mut g.game.renderer) {
+                render: |g| match g.game.game.render(&mut g.game.world, &mut g.game.render_device) {
                     Ok(_) => {}
                     Err(RenderError::Lost) => {
                         log::error!("The underlying surface has changed, and therefore the swap chain must be updated");

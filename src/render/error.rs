@@ -1,5 +1,5 @@
 use thiserror::Error;
-use wgpu::{CreateSurfaceError, RequestAdapterError, RequestDeviceError};
+use wgpu::{CreateSurfaceError, RequestAdapterError, RequestDeviceError, SurfaceError};
 
 #[derive(Debug, Error)]
 pub enum RenderError {
@@ -7,8 +7,8 @@ pub enum RenderError {
     Lost,
     #[error("There is no more memory left to allocate a new frame")]
     OutOfMemory,
-    #[error("Error acquiring current texture")]
-    SurfaceError(String),
+    #[error("Error acquiring current texture: {0}")]
+    SurfaceError(#[from] SurfaceError),
     #[error("Cannot create surface: {0}")]
     CreateSurface(#[from] CreateSurfaceError),
     #[error("Cannot request adapter: {0}")]
@@ -17,4 +17,7 @@ pub enum RenderError {
     RequestDevice(#[from] RequestDeviceError),
     #[error("Window handle error: {0}")]
     HandleError(String),
+    #[error("Buffer overflow: {0}")]
+    BufferOverflow(usize),
+    
 }

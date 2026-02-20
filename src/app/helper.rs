@@ -33,12 +33,12 @@ pub fn game_loop<G>(
 
     while !game_loop.window.should_close() {
         glfw.poll_events();
-        // for (_, event) in glfw::flush_messages(&events) {
-            // handler(&mut game_loop, &event);
-        // }
+        for (_, event) in glfw::flush_messages(&events) {
+            handler(&mut game_loop, &event);
+        }
 
-        // if !game_loop.next_frame(&mut update, &mut render) {
-            // game_loop.window.set_should_close(true);
-        // }
+        if !game_loop.next_frame(&mut update, &mut render) {
+            game_loop.window.set_should_close(true);
+        }
     }
 }
