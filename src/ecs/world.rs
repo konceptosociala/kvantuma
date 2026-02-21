@@ -1,19 +1,9 @@
-use bytemuck::Pod;
-use bytemuck::Zeroable;
-use glam::Vec3;
-use slotmap::Key;
-
 use super::archetype::*;
 use super::component::*;
-use crate::component;
-use crate::render::buffer::BufferHandle;
-use crate::render::material::TintedTextureMaterial;
-use crate::render::texture::TextureHandle;
 
 #[derive(Default)]
 pub struct World {
     archetypes: Vec<Archetype>,
-    component_meta: Vec<ComponentMeta>,
     next_entity: EntityId,
 }
 
@@ -22,13 +12,6 @@ impl World {
         World::default()
     }
 }
-
-#[derive(Clone, Copy, Zeroable, Pod, Debug)]
-#[repr(C)]
-struct PodType { a: i32 }
-
-component! { POD: PodType }
-component! { EXTERN: TintedTextureMaterial }
 
 impl World {
     pub fn spawn(&mut self, components: impl ComponentsBundle) -> EntityId {
@@ -128,39 +111,64 @@ impl World {
     }
 }
 
-use glfw::Glfw;
-
-component! { EXTERN: Glfw }
-
 #[derive(Debug)]
 pub struct ErasedQueryResult<'a> {
     pub entity: EntityId,
-    pub components: Vec<&'a [u8]>,
+    pub components: Vec<ComponentQuery<'a>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Access {
+    Read,
+    Write,
+}
+
+pub const READ: Access = Access::Read;
+pub const WRITE: Access = Access::Write;
+
+#[derive(Debug)]
+pub enum ComponentQuery<'a> {
+    Read(&'a [u8]),
+    Write(&'a mut [u8]),
 }
 
 impl World {
-    pub fn query_erased(&mut self, component_ids: &[ComponentId]) -> Vec<ErasedQueryResult<'_>> {
+    pub fn query_erased(&mut self, components: &[(ComponentId, Access)]) -> Vec<ErasedQueryResult<'_>> {
         let mut results = Vec::new();
+        let ids = components
+            .iter()
+            .map(|(id, _)| *id)
+            .collect::<Vec<_>>();
 
         for archetype in &mut self.archetypes {
-            if archetype.has_components(component_ids) {
+            if archetype.has_components(&ids) {
                 let len = archetype.entities.len();
 
-                let column_indices: Vec<usize> = component_ids
+                let column_indices: Vec<(usize, Access)> = components
                     .iter()
-                    .map(|&id| archetype.columns.iter().position(|col| col.meta.id == id).unwrap())
+                    .map(|(id, access)| (
+                        archetype.columns.iter().position(|col| col.meta.id == *id).unwrap(),
+                        *access
+                    ))
                     .collect();
-                let columns: Vec<&Column> = column_indices
+                let columns: Vec<(&Column, Access)> = column_indices
                     .iter()
-                    .map(|&idx| &archetype.columns[idx])
+                    .map(|&(idx, access)| (&archetype.columns[idx], access))
                     .collect();
 
                 for i in 0..len {
-                    let mut comps = Vec::with_capacity(component_ids.len());
-                    for col in &columns {
+                    let mut comps = Vec::with_capacity(components.len());
+                    for (col, access) in &columns {
                         unsafe {
                             let ptr = col.ptr.as_ptr().add(i * col.meta.layout.size());
-                            let slice = std::slice::from_raw_parts(ptr, col.meta.layout.size());
+                            let slice = match *access {
+                                READ => ComponentQuery::Read(
+                                    std::slice::from_raw_parts(ptr, col.meta.layout.size()),
+                                ),
+                                WRITE => ComponentQuery::Write(
+                                    std::slice::from_raw_parts_mut(ptr, col.meta.layout.size()),
+                                ),
+                            };
                             comps.push(slice);
                         }
                     }
@@ -175,14 +183,51 @@ impl World {
         results
     }
 
-    pub fn query_two_test<A: Component, B: Component>(&mut self) -> (&A, &B) {
-        let result = self.query_erased(&[A::component_id(), B::component_id()]);
-        let first = result.first().expect("Should have at least one result");
-        let a_bytes = first.components[0];
-        let b_bytes = first.components[1];
-        let a = unsafe { &*(a_bytes.as_ptr() as *const A) };
-        let b = unsafe { &*(b_bytes.as_ptr() as *const B) };
-        (a, b)
+    pub fn query<'w, Q: Query<'w>>(&'w mut self) -> Vec<Q::Result> {
+        Q::query_world(self)
+    }
+}
+
+pub trait Query<'w> {
+    type Result: 'w;
+
+    fn query_world(world: &'w mut World) -> Vec<Self::Result>;
+}
+
+impl<'w, A: Component + 'w> Query<'w> for &A {
+    type Result = &'w A;
+
+    fn query_world(world: &'w mut World) -> Vec<Self::Result> {
+        world
+            .query_erased(&[(A::component_id(), READ)])
+            .into_iter()
+            .map(|res| {
+                let ComponentQuery::Read(comp_a) = &res.components[0] else { unreachable!() };
+                unsafe { &*(comp_a.as_ptr() as *const A) }
+            })
+            .collect()
+    }
+}
+
+impl<'w, A: Component + 'w, B: Component + 'w> Query<'w> for (&A, &B) {
+    type Result = (&'w A, &'w B);
+
+    fn query_world(world: &'w mut World) -> Vec<Self::Result> {
+        world
+            .query_erased(&[
+                (A::component_id(), READ),
+                (B::component_id(), READ),
+            ])
+            .into_iter()
+            .map(|res| {
+                let ComponentQuery::Read(comp_a) = &res.components[0] else { unreachable!() };
+                let ComponentQuery::Read(comp_b) = &res.components[1] else { unreachable!() };
+                (
+                    unsafe { &*(comp_a.as_ptr() as *const A) },
+                    unsafe { &*(comp_b.as_ptr() as *const B) }
+                )
+            })
+            .collect()
     }
 }
 
@@ -219,28 +264,3 @@ impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M }
 impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N }
 impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O }
 impl_components_bundle_tuple! { A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P }
-
-pub fn x() {
-    let mut world = World::new();
-    world.spawn((
-        // PodType { a: 1332 },
-        glfw::init_no_callbacks().unwrap(),
-        TintedTextureMaterial {
-            albedo: TextureHandle::null(),
-            tint_buffer: BufferHandle::null(),
-            tint: Vec3::NEG_Z,
-        }
-    ));
-
-
-    let result = world.query_erased(&[
-        Glfw::component_id(),
-        TintedTextureMaterial::component_id(),
-    ]);
-
-    dbg!(&result);
-
-    let res2 = world.query_two_test::<Glfw, TintedTextureMaterial>();
-
-    dbg!(res2);
-}

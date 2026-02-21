@@ -3,7 +3,7 @@ use kvantuma::{
     app::{
         App, Game,
         window::{WindowDescriptor, WindowMode},
-    }, component, ecs::world::{World, x}, render::{
+    }, component, ecs::world::World, render::{
         Drawable, RenderDevice, RenderSurface, 
         buffer::BufferHandle, 
         error::RenderError, 
@@ -107,7 +107,7 @@ impl Game for KvantumaGame {
         let canvases: &[&dyn RenderSurface] = &[&canvas];
         let mut ctx = render_device.draw_ctx();
 
-        let (triangle, material) = world.query_two_test::<Triangle, TintedTextureMaterial>();
+        let (triangle, material) = world.query::<(&Triangle, &TintedTextureMaterial)>()[0];
 
         {
             let mut render_pass = ctx.render_pass(canvases, render_device.depth_texture());
